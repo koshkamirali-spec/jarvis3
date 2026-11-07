@@ -18,23 +18,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
       - name: Find Flutter Project
         shell: bash
         run: |
-          echo "Searching for pubspec.yaml..."
+          echo "Searching for Flutter project..."
 
           PROJECT_FILE=$(find . \
             -name pubspec.yaml \
@@ -44,26 +31,40 @@ jobs:
 
           if [ -z "$PROJECT_FILE" ]; then
             echo "ERROR: pubspec.yaml not found!"
-            echo "Repository files:"
-            find . -maxdepth 3 -type f | head -100
+            find . -maxdepth 4 -type f | head -150
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$PROJECT_FILE")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Flutter project found: $PROJECT_DIR"
+          echo "Project found: $PROJECT_DIR"
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter Doctor
+        run: flutter doctor -v
 
       - name: Install Dependencies
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
 
-      - name: Analyze Flutter
+      - name: Analyze Project
         working-directory: ${{ env.PROJECT_DIR }}
         continue-on-error: true
         run: flutter analyze
 
-      - name: Run Flutter Tests
+      - name: Run Tests
         working-directory: ${{ env.PROJECT_DIR }}
         continue-on-error: true
         run: flutter test
