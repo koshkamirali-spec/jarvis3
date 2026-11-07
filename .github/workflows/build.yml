@@ -1,10 +1,10 @@
 name: JARVIS Android Build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,32 +15,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Find Flutter Project
-        shell: bash
-        run: |
-          echo "Searching for Flutter project..."
-
-          PROJECT_FILE=$(find . \
-            -name pubspec.yaml \
-            -not -path '*/.dart_tool/*' \
-            -not -path '*/build/*' \
-            -print -quit)
-
-          if [ -z "$PROJECT_FILE" ]; then
-            echo "ERROR: pubspec.yaml not found!"
-            find . -maxdepth 4 -type f | head -150
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$PROJECT_FILE")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Project found: $PROJECT_DIR"
-
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -52,19 +30,34 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Flutter Doctor
-        run: flutter doctor -v
+      - name: Locate Flutter Project
+        shell: bash
+        run: |
+          FILE=$(find . -name pubspec.yaml \
+            -not -path '*/build/*' \
+            -not -path '*/.dart_tool/*' \
+            -print -quit)
+
+          if [ -z "$FILE" ]; then
+            echo "ERROR: pubspec.yaml not found."
+            echo "Upload the extracted JARVIS source files first."
+            exit 1
+          fi
+
+          DIR=$(dirname "$FILE")
+          echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
+          echo "Found project: $DIR"
 
       - name: Install Dependencies
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
 
-      - name: Analyze Project
+      - name: Analyze
         working-directory: ${{ env.PROJECT_DIR }}
         continue-on-error: true
         run: flutter analyze
 
-      - name: Run Tests
+      - name: Test
         working-directory: ${{ env.PROJECT_DIR }}
         continue-on-error: true
         run: flutter test
@@ -73,23 +66,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter build apk --debug
 
-      - name: Build Release APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        continue-on-error: true
-        run: flutter build apk --release
-
-      - name: Upload Debug APK
-        if: always()
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JARVIS-Debug-APK
+          name: JARVIS-APK
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: warn
-
-      - name: Upload Release APK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: JARVIS-Release-APK
-          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: warn
